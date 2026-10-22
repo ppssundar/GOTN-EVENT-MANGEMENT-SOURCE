@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EventDesk</title>
+<style>
+:root{--bg:#f1f3ef;--c:#fff;--tx:#16201c;--mu:#5d6862;--bd:#dfe3dd;--ac:#0e5d4b;--gold:#f2b705}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;margin:0 0 8px;line-height:1.2}
+a{color:var(--ac)}.mu{color:var(--mu)}.pre{white-space:pre-wrap}
+.w{max-width:1040px;margin:0 auto;padding:16px}
+.ban{min-height:300px;border-radius:14px;color:#fff;display:flex;align-items:flex-end;overflow:hidden;background:#0e5d4b linear-gradient(120deg,#0e5d4b,#16201c) center/cover}
+.ban>div{padding:28px;width:100%;background:linear-gradient(transparent,rgba(0,0,0,.72))}
+.ban h1{font-size:clamp(28px,5vw,46px);margin:0}.ban p{margin:6px 0 0;font-size:17px;max-width:60ch}
+.g{display:grid;grid-template-columns:1fr 330px;gap:16px;margin-top:16px;align-items:start}
+@media(max-width:800px){.g{grid-template-columns:1fr}}
+.c{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:18px;margin-bottom:16px}
+.fact{display:inline-block;border-left:3px solid var(--gold);padding:0 12px 0 8px;margin:8px 10px 0 0}
+.sp{display:flex;gap:14px;padding:12px 0;border-top:1px solid var(--bd)}.sp:first-of-type{border-top:0}
+.sp img,.av{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;background:var(--bd);display:grid;place-items:center;font:700 22px Georgia}
+iframe{width:100%;height:240px;border:0;border-radius:8px;margin:10px 0}
+.pill{display:inline-block;background:var(--bg);border-radius:99px;padding:2px 12px;margin:3px 4px 3px 0;font-size:14px}
+.price{font:700 34px Georgia}
+input,textarea,select{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:7px;font:inherit;background:#fff;color:var(--tx)}
+textarea{min-height:110px}label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
+button{font:inherit;cursor:pointer;border-radius:7px;padding:9px 15px;border:1px solid var(--bd);background:#fff;color:var(--tx)}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600;width:100%;margin-top:14px}
+button.p.inl{width:auto}button.ok{background:var(--ac);color:#fff;border-color:var(--ac)}button.no{color:#a32020}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 6px;border-top:1px solid var(--bd);vertical-align:top}
+.scroll{overflow-x:auto}.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.st{padding:2px 9px;border-radius:99px;font-size:12px;background:var(--bd)}.st.accepted{background:#cdeedd}.st.declined{background:#f6d6d6}.st.pending_review{background:#fbe9a6}
+.spk{border-top:1px solid var(--bd);padding:12px 0;display:grid;grid-template-columns:72px 1fr;gap:12px}
+.thumb{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--bd)}.bthumb{max-width:100%;max-height:120px;border-radius:8px;display:block;margin:6px 0}
+#t{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--tx);color:#fff;padding:9px 18px;border-radius:8px;display:none}
+@media(prefers-reduced-motion:no-preference){button{transition:background .15s}}
+</style></head><body>
+<div class="w" id="app"></div><div id="t" role="status"></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast=m=>{const t=$('#t');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2200)};
+const fmtDate=d=>new Date(d+'T00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const J=(b)=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+let pw=sessionStorage.pw||'',D;
+const route=()=>location.hash==='#admin'?admin():pub();
+addEventListener('hashchange',route);route();
+
+/* ---------------- public page ---------------- */
+async function pub(){
+  const d=await (await fetch('/api/event')).json(),e=d.event,loc=encodeURIComponent(e.venue+', '+e.address);document.title=e.name;
+  const people=d.attendees.map(a=>`<span class="pill">${esc(a.name)}${a.company?' · '+esc(a.company):''}</span>`).join('');
+  const who=e.visibility==='hidden'?'':`<section class="c"><h3>Who's going${d.acceptedCount!=null?' ('+d.acceptedCount+')':''}</h3>${people||`<p class="mu">${d.acceptedCount} confirmed so far. Names are kept private.</p>`}${e.visibility==='masked'?'<p class="mu">Names are masked to protect attendee privacy.</p>':''}</section>`;
+  $('#app').innerHTML=`<div class="ban" style="${e.banner?`background-image:url('${esc(e.banner)}')`:''}"><div><h1>${esc(e.name)}</h1><p>${esc(e.tagline)}</p></div></div>
+  <div class="g"><main>
+   <section class="c"><h2>About this event</h2><p class="pre">${esc(e.description)}</p>
+    <span class="fact"><b>${fmtDate(e.day)}</b></span><span class="fact">${esc(e.t_start)}–${esc(e.t_end)} IST</span><span class="fact">${esc(e.venue)}</span></section>
+   <section class="c"><h2>Speakers</h2>${d.speakers.map(s=>`<div class="sp">${s.photo?`<img src="${esc(s.photo)}" alt="${esc(s.name)}">`:`<div class="av">${esc(s.name[0]||'?')}</div>`}<div><b>${esc(s.name)}</b><br><span class="mu">${esc(s.role)}</span><br><i>${esc(s.talk)}</i>${s.linkedin?`<br><a href="${esc(s.linkedin)}" target="_blank" rel="noopener">LinkedIn profile</a>`:''}</div></div>`).join('')||'<p class="mu">Speakers will be announced soon.</p>'}</section>
+   <section class="c"><h2>Venue</h2><b>${esc(e.venue)}</b><br><span class="mu">${esc(e.address)}</span>
+    <iframe loading="lazy" title="Map" src="https://www.google.com/maps?q=${loc}&output=embed"></iframe>
+    <a href="https://www.google.com/maps/search/?api=1&query=${loc}" target="_blank" rel="noopener">Open in Google Maps</a></section>${who}
+  </main><aside><section class="c" id="tix"><div class="price">${e.price?'₹'+(e.price/100).toLocaleString('en-IN'):'Free'}</div>
+   <p class="mu">Seats are reviewed by the organizers. Declined registrations are refunded automatically.</p>
+   <form onsubmit="reg(event)"><label for="n">Full name</label><input id="n" name="name" required><label for="m">Email</label><input id="m" name="email" type="email" required><label for="o">Company (optional)</label><input id="o" name="company">
+   <button class="p">Pay and request a seat</button></form></section>
+   <p class="mu" style="font-size:13px"><a href="#admin">Organizer login</a></p></aside></div>`;
+}
+const loadRzp=()=>window.Razorpay?0:new Promise(r=>{const s=document.createElement('script');s.src='https://checkout.razorpay.com/v1/checkout.js';s.onload=r;document.head.append(s)});
+async function reg(x){
+  x.preventDefault();const b=x.target.querySelector('button');b.disabled=true;
+  const r=await fetch('/api/register',J(Object.fromEntries(new FormData(x.target)))),o=await r.json();
+  if(!r.ok){toast(o.error);b.disabled=false;return}
+  const done=async p=>{const v=await fetch('/api/verify',J({regId:o.regId,...p}));
+    $('#tix').innerHTML=v.ok?`<h3>Payment received</h3><p>Your registration is under review. We'll email <b>${esc(o.email)}</b> with the decision.</p>`:'<h3>Verification failed</h3><p>Contact the organizers with your payment ID.</p>'};
+  if(o.demo)return done({razorpay_order_id:o.orderId,razorpay_payment_id:'pay_demo_'+o.regId,razorpay_signature:'demo'});
+  await loadRzp();
+  new Razorpay({key:o.keyId,order_id:o.orderId,amount:o.amount,currency:'INR',name:o.eventName,prefill:{name:o.name,email:o.email},theme:{color:'#0e5d4b'},handler:done,modal:{ondismiss:()=>b.disabled=false}}).open();
+}
+
+/* ---------------- admin ---------------- */
+const A=async(p,m='GET',b)=>{const r=await fetch(p,{method:m,headers:{'x-admin-password':pw,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.error||'Something went wrong');return j};
+async function upl(inp){const f=new FormData();f.append('file',inp.files[0]);const r=await fetch('/api/admin/upload',{method:'POST',headers:{'x-admin-password':pw},body:f}),j=await r.json();if(!r.ok){toast(j.error);return null}return j.url}
+const F=[['name','Event name'],['tagline','Tagline'],['day','Date','date'],['t_start','Start (IST)','time'],['t_end','End (IST)','time'],['venue','Venue name'],['address','Venue address'],['price','Ticket price (₹)','number'],['capacity','Capacity','number']];
+async function admin(){
+  if(!pw){pw=prompt('Admin password')||'';sessionStorage.pw=pw}
+  const r=await fetch('/api/admin/data',{headers:{'x-admin-password':pw}});
+  if(r.status===401){sessionStorage.pw=pw='';toast('Wrong password');location.hash='';return}
+  D=await r.json();draw();
+}
+function sync(){const v=k=>$('#f_'+k).value,e=D.event;F.forEach(([k])=>e[k]=v(k));e.price=Math.round(+v('price')*100);e.description=v('description');e.visibility=v('visibility')}
+async function saveEv(){sync();await A('/api/admin/event','PUT',D.event);toast('Event saved')}
+async function saveSp(){await A('/api/admin/speakers','PUT',D.speakers);toast('Speakers saved')}
+async function banner(i){sync();const u=await upl(i);if(u){D.event.banner=u;draw()}}
+async function photo(i,inp){sync();const u=await upl(inp);if(u){D.speakers[i].photo=u;draw()}}
+function addSp(){sync();D.speakers.push({name:'',role:'',talk:'',photo:'',linkedin:''});draw()}
+function delSp(i){sync();D.speakers.splice(i,1);draw()}
+async function decide(id,d){if(!confirm(d==='accepted'?'Accept this registration and notify them?':'Decline, refund and send the declined receipt?'))return;const j=await A(`/api/admin/regs/${id}/decision`,'POST',{decision:d});if(j.ok){toast(d==='accepted'?'Accepted, email queued':'Declined, receipt sent');admin()}}
+function draw(){
+  const e=D.event,pend=D.regs.filter(r=>r.status==='pending_review').length;
+  $('#app').innerHTML=`<h1>Organizer dashboard</h1><p><a href="#">← View public page</a></p>
+  <section class="c"><h2>Registrations <small class="mu">(${pend} awaiting review)</small></h2><div class="scroll">${D.regs.length?`<table><tr><th>Name</th><th>Email</th><th>Company</th><th>Payment</th><th>Status</th><th></th></tr>${D.regs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.email)}</td><td>${esc(r.company)}</td><td>${esc(r.payment_id)}</td><td><span class="st ${r.status}">${r.status.replace('_',' ')}</span></td><td>${r.status==='pending_review'?`<button class="ok" onclick="decide(${r.id},'accepted')">Accept</button> <button class="no" onclick="decide(${r.id},'declined')">Decline</button>`:''}</td></tr>`).join('')}</table>`:'<p class="mu">No paid registrations yet. Register from the public page to test the flow.</p>'}</div></section>
+  <section class="c"><h2>Event page</h2>
+   <label>Banner image</label>${e.banner?`<img class="bthumb" src="${esc(e.banner)}" alt="">`:''}<input type="file" accept="image/*" onchange="banner(this)">
+   <div class="row2">${F.map(([k,l,t])=>`<div><label for="f_${k}">${l}</label><input id="f_${k}" type="${t||'text'}" value="${esc(k==='price'?e.price/100:e[k])}"></div>`).join('')}</div>
+   <label for="f_description">Description</label><textarea id="f_description">${esc(e.description)}</textarea>
+   <label for="f_visibility">Who sees the attendee list?</label><select id="f_visibility">${[['public','Show full names (accepted only)'],['masked','Show masked names, e.g. P••••• S•••'],['count','Show only the count'],['hidden','Hide completely']].map(([v,l])=>`<option value="${v}" ${e.visibility===v?'selected':''}>${l}</option>`).join('')}</select>
+   <button class="p inl" onclick="saveEv()">Save event</button></section>
+  <section class="c"><h2>Speakers</h2>${D.speakers.map((s,i)=>`<div class="spk">${s.photo?`<img class="thumb" src="${esc(s.photo)}" alt="">`:'<div class="thumb"></div>'}<div>
+   <div class="row2"><input placeholder="Name" value="${esc(s.name)}" oninput="D.speakers[${i}].name=this.value"><input placeholder="Role, company" value="${esc(s.role)}" oninput="D.speakers[${i}].role=this.value"></div>
+   <input style="margin-top:8px" placeholder="Talk title" value="${esc(s.talk)}" oninput="D.speakers[${i}].talk=this.value">
+   <input style="margin-top:8px" placeholder="LinkedIn URL (https://linkedin.com/in/…)" value="${esc(s.linkedin)}" oninput="D.speakers[${i}].linkedin=this.value">
+   <div style="margin-top:8px"><input type="file" accept="image/*" onchange="photo(${i},this)" style="width:auto"> <button class="no" onclick="delSp(${i})">Remove</button></div></div></div>`).join('')}
+   <button onclick="addSp()">Add speaker</button> <button class="p inl" onclick="saveSp()">Save speakers</button></section>`;
+}
+</script></body></html>
